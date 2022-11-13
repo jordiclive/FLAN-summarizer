@@ -220,11 +220,11 @@ class ClassificationTransformer(BaseTransformer):
 
         # for k,v in logs.items():
         #     self.log(k,v,sync_dist=True)
-        self.log(
-            "rate",
-            self.trainer.lr_schedulers[0]["scheduler"].get_last_lr()[-1],
-            rank_zero_only=True,
-        )
+        # self.log(
+        #     "rate",
+        #     self.trainer.lr_schedulers[0]["scheduler"].get_last_lr()[-1],
+        #     rank_zero_only=True,
+        # )
         return {"loss": loss}
 
     def get_dataloader(
@@ -278,7 +278,7 @@ class ClassificationTransformer(BaseTransformer):
             self.model.save_pretrained(save_path)
             self.tokenizer.save_pretrained(save_path)
             raise ValueError("just saving")
-        return self._generative_step(batch)
+        return self._generative_step(batch,batch_idx)
 
     def _generative_step(
         self, batch: dict, batch_idx=None, dataloader_idx=None
@@ -299,6 +299,11 @@ class ClassificationTransformer(BaseTransformer):
         gen_time = (time.time() - t0) / batch["input_ids"].shape[0]
         preds: List[str] = self.ids_to_clean_text(generated_ids)
         target: List[str] = self.ids_to_clean_text(batch["labels"])
+        if batch_idx == 0:
+            source: List[str] = self.ids_to_clean_text(batch["input_ids"])
+            for i,j in enumerate(preds):
+                rank_zero_info(f'source {source[i][:100]}...{source[i][-100:]} \n')
+                rank_zero_info(f'pred: {preds[i]} \n target: {target[i]} \n\n\n')
         loss = self._step(batch)[0]
         base_metrics = {"loss": loss}
         rouge: Dict = self.calc_generative_metrics(preds, target)
